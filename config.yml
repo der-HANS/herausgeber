@@ -1,0 +1,7 @@
+# WordPress конфигурация
+# Храните этот файл в безопасности и не коммитьте в репозиторий
+
+wordpress:
+  host: "https://pnisurov.ru/xmlrpc.php"
+  username: "your_username"
+  password: "your_password"
