@@ -1,7 +1,0 @@
-# WordPress конфигурация
-# Храните этот файл в безопасности и не коммитьте в репозиторий
-
-wordpress:
-  host: "www.pnisurov.ru"
-  username: "1"
-  password: "1"
