@@ -1,5 +1,8 @@
+# Credital
+config.yml
+
 # Dependencies
-vendor/
+vendor/bundle/
 
 # Logs and temp files
 *.log
@@ -8,26 +11,28 @@ vendor/
 # Environment
 .env
 .env.local
-*.env.*
+.env.*
 
-# Editors
+# Editor/IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# OS generated files
+# OS
 .DS_Store
 Thumbs.db
 
 # Build artifacts
 *.o
 *.obj
+*.out
 *.exe
 *.dll
 *.so
 *.a
-*.out
 
-# Python specific
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -36,6 +41,7 @@ __pycache__/
 env/
 venv/
 .venv/
+.venv.bak/
 pip-log.txt
 pip-delete-this-directory.txt
 .tox/
@@ -46,91 +52,47 @@ nosetests.xml
 coverage.xml
 *.cover
 *.log
-.git/
-.mypy_cache/
-.pytest_cache/
-.hypothesis/
+*.pot
+*.pyc
+*.pyo
+*.pyd
+.MF
+tags
+TAGS
+*.tmproj
+*.ctags
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
 
-# Ruby specific
-*.gem
-*.rbc
+# Ruby
 .bundle/
-.config/
-.yardoc
-_yardoc/
-doc/
-.rdoc
-.rbx/
-.libs/
-InstalledFiles
-pkg/
-spec/reports/
-test/tmp/
-test/version_tmp/
-tmp/
-*.pdb
-*.sqlite3
-.rakeTasks
 Gemfile.lock
-.rubocop.yml
-rubocop_todo.yml
+.ruby-version
+.rbenv-gemsets
+.rbenv-vars
+rbenv-default-gems
+rbenv-gemsets
+*.gem
+/.bundle
+/build/
+/lib/bundler/man/
+/pkg/
+/test/tmp/
+/test/version_tmp/
+/tmp/
 
-# WordPress specific
-wp-content/cache/
-wp-content/uploads/
+# WordPress
+wp-content/
 wp-config.php
-sitemap.xml
-robots.txt
-
-# Archives
-*.zip
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.7z
-*.rar
-*.gz
-*.bz2
-*.xz
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar
-*.tgz
-*.tbz
-*.tbz2
-*.tz
-*.txz
-*.tZ
-*.tlz
-*.tzst
-*.tz2
-*.tb2
-*.taz
-*.tlz
-*.txz
-*.tar.Z
-*.tar.lz
-*.tar.lzo
-*.tar.lz4
-*.tar.lzh
-*.tar.cab
-*.tar.arj
-*.tar.rpm
-*.tar.deb
-*.tar.Z
-*.tar.lz
-*.tar.lzo
-*.tar.lz4
-*.tar.lzh
-*.tar.cab
-*.tar.arj
-*.tar.rpm
-*.tar.deb
+wp-config-sample.php
+wp-load.php
+wp-settings.php
