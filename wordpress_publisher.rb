@@ -1,9 +1,13 @@
+#!/bin/env ruby
+# encoding: utf-8
+
 # WordPress Publisher Module
 # Модуль для работы с WordPress через gem rubypress
 
 require 'rubypress'
 require 'base64'
 require 'set'
+require 'mime/types'
 
 class WordPressPublisher
   IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp].freeze
@@ -22,7 +26,11 @@ class WordPressPublisher
       @client = Rubypress::Client.new(
         host: @config['host'],
         username: @config['username'],
-        password: @config['password']
+        password: @config['password'],
+        retry_timeouts: true,
+        timeout: 180,
+        debug: false,
+        use_ssl: true 
       )
       puts "✓ Успешное подключение к WordPress"
       true
@@ -38,15 +46,13 @@ class WordPressPublisher
     begin
       file_content = File.read(file_path)
       filename = File.basename(file_path)
-      
-      data = {
-        name: filename,
-        type: mime_type,
-        bits: Base64.strict_encode64(file_content),
-        overwrite: true
-      }
 
-      result = @client.upload_file(data)
+      result = @client.uploadFile(:data => {
+                    :name => filename,
+                    :type => MIME::Types.type_for(file_path).first.to_s,
+                    :bits => XMLRPC::Base64.new(IO.read(file_path)),
+                    :overwrite => true
+      })
       
       if result && result['id']
         puts "✓ Файл загружен: #{filename} (ID: #{result['id']}, URL: #{result['url']})"
@@ -146,19 +152,40 @@ HTML
   # status: статус поста ('publish', 'draft', etc.)
   def publish_post(title, content, featured_image_id = nil, status = 'publish')
     begin
-      post_data = {
-        title: title,
-        description: content,
-        post_status: status
-      }
+      # post_data = {
+      #   title: title,
+      #   description: content,
+      #   post_status: status
+      # }
 
-      if featured_image_id
-        post_data[:thumbnail] = featured_image_id
-      end
+      # if featured_image_id
+      #   post_data[:thumbnail] = featured_image_id
+      # end
 
-      result = @client.new_post(post_data)
-      
-      if result && result.is_a?(Integer)
+      # result = @client.newPost(post_data)
+
+      result = @client.newPost( 
+            :blog_id => 0,                                          # 0 unless using WP Multi-Site, then use the blog id
+            :content => {
+                :post_status  => "publish",
+                # :post_date    => @newslist[index][:date],
+
+                :post_content => content,
+                :post_title   => title,
+                
+                :post_thumbnail => featured_image_id,
+                # :post_excerpt   => (post_excerpt || ""), 
+                :comment_status => "closed",
+                # :post_name    => "/rubypress-is-the-best",
+                :post_author  => 1                                  # 1 if there is only the admin user, otherwise the user's id
+                # :terms_names  => {
+                #     :category   => ['Category One','Category Two','Category Three'],
+                #     :post_tag => ['Tag One','Tag Two', 'Tag Three']
+                #     }
+            }
+        )
+
+      if result && !result.to_i.zero?
         puts "✓ Пост успешно опубликован! ID поста: #{result}"
         { success: true, post_id: result }
       else
