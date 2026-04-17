@@ -20,7 +20,7 @@ class Herausgeber
 
   # Загрузка конфигурации из config.yml
   def load_config
-    config_path = File.join(File.dirname(__FILE__), 'config.yml')
+    config_path = File.join(File.dirname(__FILE__), '../config.yml')
     
     unless File.exist?(config_path)
       puts "✗ Ошибка: Файл конфигурации config.yml не найден"
