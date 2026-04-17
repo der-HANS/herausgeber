@@ -3,8 +3,12 @@
 
 require 'rubypress'
 require 'base64'
+require 'set'
 
 class WordPressPublisher
+  IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp].freeze
+  VIDEO_EXTENSIONS = %w[.mp4 .mov .avi .wmv].freeze
+  
   attr_reader :client, :config
 
   def initialize(config)
@@ -185,33 +189,84 @@ HTML
       featured_image_id = media_result[:id] if media_result
     end
 
+    # Словарь для хранения загруженных медиафайлов по имени файла
+    uploaded_media = {}
+    
+    # Все медиафайлы (изображения и видео) для обработки
+    all_media_files = images + videos
+    
+    # Загружаем все медиафайлы заранее и сохраняем в словарь
+    all_media_files.each do |file_path|
+      next unless File.exist?(file_path)
+      filename = File.basename(file_path)
+      mime_type = get_mime_type(file_path)
+      media_result = upload_media(file_path, mime_type)
+      if media_result
+        uploaded_media[filename] = {
+          id: media_result[:id],
+          url: media_result[:url],
+          path: file_path,
+          is_video: VIDEO_EXTENSIONS.any? { |ext| file_path.downcase.end_with?(ext) }
+        }
+      end
+    end
+    
+    # Отслеживаем файлы, которые были использованы во вставках
+    used_in_insertions = Set.new
+    
     # Формирование контента поста
     content_parts = []
+    first_video_global = true
     
-    # Добавляем абзацы текста
+    # Добавляем абзацы текста, обрабатывая вставки [имя файла]
     paragraphs.each do |paragraph|
-      next if paragraph.strip.empty?
-      content_parts << generate_paragraph_block(paragraph.strip)
-    end
-
-    # Добавляем изображения
-    images.each do |image_path|
-      next unless File.exist?(image_path)
-      mime_type = get_mime_type(image_path)
-      media_result = upload_media(image_path, mime_type)
-      if media_result
-        content_parts << generate_image_block(media_result[:id], media_result[:url])
+      # Ищем все вставки [имя файла] в абзаце
+      insertion_pattern = /\[([^\]]+)\]/
+      
+      if paragraph.match?(insertion_pattern)
+        # Разбиваем абзац на части по вставкам
+        parts = paragraph.split(insertion_pattern)
+        
+        parts.each_with_index do |part, index|
+          if index % 2 == 0
+            # Это обычный текст (не имя файла)
+            unless part.strip.empty?
+              content_parts << generate_paragraph_block(part.strip)
+            end
+          else
+            # Это имя файла из вставки [имя файла]
+            filename = part.strip
+            if uploaded_media.key?(filename)
+              media_info = uploaded_media[filename]
+              used_in_insertions.add(filename)
+              
+              if media_info[:is_video]
+                content_parts << generate_video_block(media_info[:id], media_info[:url], first_video_global)
+                first_video_global = false
+              else
+                content_parts << generate_image_block(media_info[:id], media_info[:url])
+              end
+            else
+              puts "⚠ Предупреждение: Файл '#{filename}' не найден среди медиафайлов"
+            end
+          end
+        end
+      else
+        # Обычный абзац без вставок
+        next if paragraph.strip.empty?
+        content_parts << generate_paragraph_block(paragraph.strip)
       end
     end
 
-    # Добавляем видео (первое с autoplay, остальные без)
-    videos.each_with_index do |video_path, index|
-      next unless File.exist?(video_path)
-      mime_type = get_mime_type(video_path)
-      media_result = upload_media(video_path, mime_type)
-      if media_result
-        first_video = (index == 0)
-        content_parts << generate_video_block(media_result[:id], media_result[:url], first_video)
+    # Добавляем оставшиеся медиафайлы (не использованные во вставках) перед футером
+    uploaded_media.each do |filename, media_info|
+      unless used_in_insertions.include?(filename)
+        if media_info[:is_video]
+          content_parts << generate_video_block(media_info[:id], media_info[:url], first_video_global)
+          first_video_global = false
+        else
+          content_parts << generate_image_block(media_info[:id], media_info[:url])
+        end
       end
     end
 
