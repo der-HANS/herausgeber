@@ -2,6 +2,10 @@
 # Храните этот файл в безопасности и не коммитьте в репозиторий
 
 wordpress:
-  host: "www.pnisurov.ru"
+  host: "https://www.pnisurov.ru/xmlrpc.php"
   username: ""
   password: ""
+
+vkontakte:
+  access_token: ""
+  group_id: ""
