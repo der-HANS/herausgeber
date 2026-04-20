@@ -1,1 +1,98 @@
-Nothing should be ignored based on the provided file changes, as they only include source code and configuration files (.rb, .gemfile, .md, .yml). No build artifacts, dependencies, or temporary files are present in the changes.
+# Credital
+config.yml
+
+# Dependencies
+vendor/bundle/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.o
+*.obj
+*.out
+*.exe
+*.dll
+*.so
+*.a
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+.MF
+tags
+TAGS
+*.tmproj
+*.ctags
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Ruby
+.bundle/
+Gemfile.lock
+.ruby-version
+.rbenv-gemsets
+.rbenv-vars
+rbenv-default-gems
+rbenv-gemsets
+*.gem
+/.bundle
+/build/
+/lib/bundler/man/
+/pkg/
+/test/tmp/
+/test/version_tmp/
+/tmp/
+
+# WordPress
+wp-content/
+wp-config.php
+wp-config-sample.php
+wp-load.php
+wp-settings.php
