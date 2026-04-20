@@ -9,3 +9,9 @@ wordpress:
 vkontakte:
   access_token: ""
   group_id: ""
+
+odnoklassniki:
+  access_token: ""
+  group_id: ""
+  application_key: ""
+  application_secret: ""
