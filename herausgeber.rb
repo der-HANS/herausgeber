@@ -7,6 +7,7 @@ require 'yaml'
 require 'pathname'
 require_relative 'wordpress_publisher'
 require_relative 'vk_publisher'
+require_relative 'ok_publisher'
 
 class Herausgeber
   IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp].freeze
@@ -154,6 +155,7 @@ class Herausgeber
     puts "=" * 50
     puts "1. Опубликовать новость на сайт pnisurov.ru"
     puts "2. Опубликовать новость в VKontakte (vk.com)"
+    puts "3. Опубликовать новость в Одноклассниках (ok.ru)"
     puts "0. Завершить работу и показать отчет"
     puts "-" * 50
     print "Выберите опцию: "
@@ -166,6 +168,8 @@ class Herausgeber
       :wordpress_pnisurov
     when '2'
       :vkontakte
+    when '3'
+      :odnoklassniki
     when '0', nil
       :exit
     else
@@ -182,6 +186,7 @@ class Herausgeber
     
     wordpress_url = nil
     vk_url = nil
+    ok_url = nil
     
     @publications.each do |pub|
       case pub[:platform]
@@ -189,6 +194,8 @@ class Herausgeber
         wordpress_url = pub[:url]
       when :vkontakte
         vk_url = pub[:url]
+      when :odnoklassniki
+        ok_url = pub[:url]
       end
     end
     
@@ -199,9 +206,9 @@ class Herausgeber
       puts "[1] Ссылка на публикацию информации на Сайте учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» (https://www.pnisurov.ru/ ): не опубликовано"
     end
     
-    # [2] Ссылка на Одноклассники (пока используем URL из VK, так как это одна связь)
-    if vk_url
-      puts "[2] Ссылка на публикацию информации в госпаблике учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в социальной сети Одноклассники (https://ok.ru/pnisurov ): #{vk_url}"
+    # [2] Ссылка на Одноклассники
+    if ok_url
+      puts "[2] Ссылка на публикацию информации в госпаблике учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в социальной сети Одноклассники (https://ok.ru/pnisurov ): #{ok_url}"
     else
       puts "[2] Ссылка на публикацию информации в госпаблике учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в социальной сети Одноклассники (https://ok.ru/pnisurov ): не опубликовано"
     end
@@ -269,6 +276,12 @@ class Herausgeber
           @publications << { platform: :vkontakte, url: result[:url], title: text_data[:title] }
           puts "\n✓ Публикация в VKontakte выполнена успешно!"
         end
+      when :odnoklassniki
+        result = publish_to_odnoklassniki(files, text_data)
+        if result && result[:success]
+          @publications << { platform: :odnoklassniki, url: result[:url], title: text_data[:title] }
+          puts "\n✓ Публикация в Одноклассниках выполнена успешно!"
+        end
       when :exit
         # Вывод отчета и завершение
         print_report(text_data[:title])
@@ -319,6 +332,29 @@ class Herausgeber
     end
     
     publisher = VKPublisher.new(vk_config)
+    
+    # Публикация новости
+    result = publisher.publish_news(
+      text_data[:title],
+      text_data[:paragraphs],
+      files[:logo],
+      files[:images],
+      files[:videos]
+    )
+    
+    result
+  end
+  
+  # Публикация в Одноклассниках
+  def publish_to_odnoklassniki(files, text_data)
+    ok_config = @config['odnoklassniki']
+    
+    unless ok_config && ok_config['access_token'] && ok_config['group_id'] && ok_config['application_key'] && ok_config['application_secret']
+      puts "✗ Ошибка: В config.yml отсутствуют настройки для Одноклассников (access_token, group_id, application_key, application_secret)"
+      return { success: false, error: "Отсутствуют настройки Одноклассников" }
+    end
+    
+    publisher = OKPublisher.new(ok_config)
     
     # Публикация новости
     result = publisher.publish_news(
