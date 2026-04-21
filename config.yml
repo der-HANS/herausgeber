@@ -15,3 +15,7 @@ odnoklassniki:
   group_id: ""
   application_key: ""
   application_secret: ""
+
+max:
+  access_token: ""
+  channel_id: "id3430030612_gos"

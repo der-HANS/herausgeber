@@ -8,6 +8,7 @@ require 'pathname'
 require_relative 'wordpress_publisher'
 require_relative 'vk_publisher'
 require_relative 'ok_publisher'
+require_relative 'max_publisher'
 
 class Herausgeber
   IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp].freeze
@@ -156,6 +157,7 @@ class Herausgeber
     puts "1. Опубликовать новость на сайт pnisurov.ru"
     puts "2. Опубликовать новость в VKontakte (vk.com)"
     puts "3. Опубликовать новость в Одноклассниках (ok.ru)"
+    puts "4. Опубликовать новость в MAX Messenger"
     puts "0. Завершить работу и показать отчет"
     puts "-" * 50
     print "Выберите опцию: "
@@ -170,6 +172,8 @@ class Herausgeber
       :vkontakte
     when '3'
       :odnoklassniki
+    when '4'
+      :max_messenger
     when '0', nil
       :exit
     else
@@ -187,6 +191,7 @@ class Herausgeber
     wordpress_url = nil
     vk_url = nil
     ok_url = nil
+    max_url = nil
     
     @publications.each do |pub|
       case pub[:platform]
@@ -196,6 +201,8 @@ class Herausgeber
         vk_url = pub[:url]
       when :odnoklassniki
         ok_url = pub[:url]
+      when :max
+        max_url = pub[:url]
       end
     end
     
@@ -224,7 +231,11 @@ class Herausgeber
     puts "[4] Ссылка на публикацию информации на странице учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» на официальном портале Поставщиков социальных услуг Волгоградской области (https://442fz.volganet.ru/025016/ ): не опубликовано"
     
     # [5] Ссылка на MAX
-    puts "[5] Ссылка на публикацию информации в официальной группе учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в Национальном мессенджере MAX (https://max.ru/id3430030612_gos ): не опубликовано"
+    if max_url
+      puts "[5] Ссылка на публикацию информации в официальной группе учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в Национальном мессенджере MAX (https://max.ru/id3430030612_gos ): #{max_url}"
+    else
+      puts "[5] Ссылка на публикацию информации в официальной группе учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в Национальном мессенджере MAX (https://max.ru/id3430030612_gos ): не опубликовано"
+    end
     
     puts "=" * 80
   end
@@ -281,6 +292,12 @@ class Herausgeber
         if result && result[:success]
           @publications << { platform: :odnoklassniki, url: result[:url], title: text_data[:title] }
           puts "\n✓ Публикация в Одноклассниках выполнена успешно!"
+        end
+      when :max_messenger
+        result = publish_to_max(files, text_data)
+        if result && result[:success]
+          @publications << { platform: :max, url: result[:url], title: text_data[:title] }
+          puts "\n✓ Публикация в MAX Messenger выполнена успешно!"
         end
       when :exit
         # Вывод отчета и завершение
@@ -355,6 +372,29 @@ class Herausgeber
     end
     
     publisher = OKPublisher.new(ok_config)
+    
+    # Публикация новости
+    result = publisher.publish_news(
+      text_data[:title],
+      text_data[:paragraphs],
+      files[:logo],
+      files[:images],
+      files[:videos]
+    )
+    
+    result
+  end
+  
+  # Публикация в MAX Messenger
+  def publish_to_max(files, text_data)
+    max_config = @config['max']
+    
+    unless max_config && max_config['access_token'] && max_config['channel_id']
+      puts "✗ Ошибка: В config.yml отсутствуют настройки для MAX Messenger (access_token, channel_id)"
+      return { success: false, error: "Отсутствуют настройки MAX Messenger" }
+    end
+    
+    publisher = MaxPublisher.new(max_config)
     
     # Публикация новости
     result = publisher.publish_news(
