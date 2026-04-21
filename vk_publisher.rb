@@ -156,9 +156,12 @@ class VKPublisher
           access_token: @access_token,
           v: '5.131',
           group_id: @group_id
-        }
+        },
+        debug_output: $stdout
       )
-      
+   
+  pp upload_url_response
+
       if upload_url_response.parsed_response['error']
         puts "✗ Ошибка получения URL загрузки: #{upload_url_response.parsed_response['error']['error_msg']}"
         return nil
