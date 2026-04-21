@@ -15,6 +15,10 @@ class MaxPublisher
   # Базовый URL API MAX
   BASE_URL = 'https://api.max.ru'
   
+  # Эндпоинты API согласно документации https://dev.max.ru/docs-api
+  UPLOAD_ENDPOINT = '/uploads'
+  MESSAGES_ENDPOINT = '/messages'
+  
   attr_reader :config, :access_token, :channel_id
   
   def initialize(config)
@@ -149,62 +153,27 @@ class MaxPublisher
                      else 'image/jpeg'
                      end
       
-      # Шаг 1: Получаем URL для загрузки файла
-      upload_url_response = HTTParty.post(
-        "#{BASE_URL}/api/v1/upload/image",
+      # Загружаем файл напрямую через POST /uploads
+      file_data = File.read(file_path)
+      
+      response = HTTParty.post(
+        "#{BASE_URL}#{UPLOAD_ENDPOINT}",
         headers: {
-          'Authorization' => "Bearer #{@access_token}",
-          'Content-Type' => 'application/json'
+          'Authorization' => "Bearer #{@access_token}"
         },
         body: {
-          filename: filename,
-          content_type: content_type
-        }.to_json
-      )
-      
-      if upload_url_response.code != 200
-        puts "✗ Ошибка получения URL загрузки: #{upload_url_response.code} - #{upload_url_response.message}"
-        return nil
-      end
-      
-      upload_data = upload_url_response.parsed_response
-      upload_url = upload_data['upload_url']
-      file_id = upload_data['file_id']
-      
-      # Шаг 2: Загружаем файл по полученному URL
-      file_data = File.read(file_path)
-      upload_response = HTTParty.put(
-        upload_url,
-        body: file_data,
-        headers: {
-          'Content-Type' => content_type
+          file: HTTParty::UploadIO.new(file_path, content_type, filename)
         }
       )
       
-      if upload_response.code != 200
-        puts "✗ Ошибка загрузки файла: #{upload_response.code} - #{upload_response.message}"
+      if response.code != 200
+        puts "✗ Ошибка загрузки файла: #{response.code} - #{response.message}"
+        puts "Ответ API: #{response.body}"
         return nil
       end
       
-      # Шаг 3: Подтверждаем загрузку
-      confirm_response = HTTParty.post(
-        "#{BASE_URL}/api/v1/upload/confirm",
-        headers: {
-          'Authorization' => "Bearer #{@access_token}",
-          'Content-Type' => 'application/json'
-        },
-        body: {
-          file_id: file_id
-        }.to_json
-      )
-      
-      if confirm_response.code != 200
-        puts "✗ Ошибка подтверждения загрузки: #{confirm_response.code}"
-        return nil
-      end
-      
-      file_info = confirm_response.parsed_response
-      file_uuid = file_info['uuid'] || file_info['file_id']
+      file_info = response.parsed_response
+      file_uuid = file_info['uuid'] || file_info['file_id'] || file_info['id']
       
       puts "✓ Изображение загружено: #{file_uuid}"
       
@@ -226,66 +195,27 @@ class MaxPublisher
   def upload_video(file_path)
     begin
       filename = File.basename(file_path)
-      filesize = File.size(file_path)
       content_type = 'video/mp4'
       
-      # Шаг 1: Создаем запись видео и получаем URL для загрузки
-      create_response = HTTParty.post(
-        "#{BASE_URL}/api/v1/upload/video",
+      # Загружаем файл напрямую через POST /uploads
+      response = HTTParty.post(
+        "#{BASE_URL}#{UPLOAD_ENDPOINT}",
         headers: {
-          'Authorization' => "Bearer #{@access_token}",
-          'Content-Type' => 'application/json'
+          'Authorization' => "Bearer #{@access_token}"
         },
         body: {
-          filename: filename,
-          content_type: content_type,
-          size: filesize
-        }.to_json
-      )
-      
-      if create_response.code != 200
-        puts "✗ Ошибка создания видео: #{create_response.code} - #{create_response.message}"
-        return nil
-      end
-      
-      upload_data = create_response.parsed_response
-      upload_url = upload_data['upload_url']
-      file_id = upload_data['file_id']
-      
-      # Шаг 2: Загружаем файл по полученному URL
-      file_data = File.read(file_path)
-      upload_response = HTTParty.put(
-        upload_url,
-        body: file_data,
-        headers: {
-          'Content-Type' => content_type
+          file: HTTParty::UploadIO.new(file_path, content_type, filename)
         }
       )
       
-      if upload_response.code != 200
-        puts "✗ Ошибка загрузки видео: #{upload_response.code} - #{upload_response.message}"
+      if response.code != 200
+        puts "✗ Ошибка загрузки файла: #{response.code} - #{response.message}"
+        puts "Ответ API: #{response.body}"
         return nil
       end
       
-      # Шаг 3: Подтверждаем загрузку
-      confirm_response = HTTParty.post(
-        "#{BASE_URL}/api/v1/upload/confirm",
-        headers: {
-          'Authorization' => "Bearer #{@access_token}",
-          'Content-Type' => 'application/json'
-        },
-        body: {
-          file_id: file_id
-        }.to_json
-      )
-      
-      if confirm_response.code != 200
-        puts "✗ Ошибка подтверждения загрузки видео: #{confirm_response.code}"
-        return nil
-      end
-      
-      file_info = confirm_response.parsed_response
-      file_uuid = file_info['uuid'] || file_info['file_id']
+      file_info = response.parsed_response
+      file_uuid = file_info['uuid'] || file_info['file_id'] || file_info['id']
       
       puts "✓ Видео загружено: #{file_uuid}"
       
@@ -308,13 +238,10 @@ class MaxPublisher
   def send_message(message_text, attachments)
     begin
       # Формируем тело сообщения согласно API MAX
-      # Используем format: "html" для поддержки HTML тегов (жирный шрифт и т.д.)
+      # POST https://dev.max.ru/docs-api/methods/POST/messages
       payload = {
         channel_id: @channel_id,
-        body: {
-          text: message_text,
-          format: 'html'  # Используем HTML форматирование для поддержки <b>тегов</b>
-        }
+        text: message_text
       }
       
       # Добавляем attachments если они есть
@@ -328,7 +255,7 @@ class MaxPublisher
       end
       
       response = HTTParty.post(
-        "#{BASE_URL}/api/v1/channel/message",
+        "#{BASE_URL}#{MESSAGES_ENDPOINT}",
         headers: {
           'Authorization' => "Bearer #{@access_token}",
           'Content-Type' => 'application/json'
