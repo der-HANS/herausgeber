@@ -8,10 +8,13 @@ require 'rubypress'
 require 'base64'
 require 'set'
 require 'mime/types'
+require 'uri'
 
 class WordPressPublisher
   IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp].freeze
   VIDEO_EXTENSIONS = %w[.mp4 .mov .avi .wmv].freeze
+
+  EMOJI_REGEX = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/
   
   attr_reader :client, :config
 
@@ -20,6 +23,7 @@ class WordPressPublisher
     @client = nil
   end
 
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Инициализация соединения с WordPress
   def connect
     begin
@@ -40,6 +44,7 @@ class WordPressPublisher
     end
   end
 
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Загрузка медиафайла на WordPress
   # Возвращает hash с id и url загруженного файла
   def upload_media(file_path, mime_type)
@@ -67,6 +72,7 @@ class WordPressPublisher
     end
   end
 
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Определение MIME типа по расширению файла
   def get_mime_type(file_path)
     ext = File.extname(file_path).downcase
@@ -92,6 +98,7 @@ class WordPressPublisher
     end
   end
 
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Генерация HTML блока для абзаца текста (Gutenberg формат)
   def generate_paragraph_block(text)
     escaped_text = escape_html(text)
@@ -102,6 +109,7 @@ class WordPressPublisher
 HTML
   end
 
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Генерация HTML блока для изображения (Gutenberg формат)
   def generate_image_block(image_id, image_url)
     <<-HTML
@@ -113,6 +121,7 @@ HTML
 HTML
   end
 
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Генерация HTML блока для видео (Gutenberg формат)
   # first_video: true - добавляет autoplay, false - только controls
   def generate_video_block(video_id, video_url, first_video = false)
@@ -127,6 +136,7 @@ HTML
 HTML
   end
 
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Генерация футера новости (Gutenberg формат)
   def generate_footer_block
     <<-HTML
@@ -135,22 +145,24 @@ HTML
 <!-- /wp:separator -->
 
 <!-- wp:paragraph -->
-<p><em>Более подробная информация и актуальные новости доступны в нашем официальном канале в мессенджере <strong><a href="https://max.ru/id3430030612_gos ">MAX</a></strong></em></p>
+<p><em>Больше новостей — в нашем официальном канале в <strong><a href="https://max.ru/id3430030612_gos">мессенджере MAX</a></strong></em></p>
 <!-- /wp:paragraph -->
 HTML
   end
 
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Экранирование HTML специальных символов
   def escape_html(text)
     text.to_s.gsub('&', '&amp;').gsub('<', '&lt;').gsub('>', '&gt;').gsub('"', '&quot;').gsub("'", '&#39;')
   end
 
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Публикация поста на WordPress
   # title: заголовок поста
   # content: содержимое поста (HTML строка)
   # featured_image_id: ID обложки (может быть nil)
   # status: статус поста ('publish', 'draft', etc.)
-  def publish_post(title, content, featured_image_id = nil, status = 'publish')
+  def publish_post(title, content, paragraphs = [], featured_image_id = nil, status = 'publish')
     begin
       # post_data = {
       #   title: title,
@@ -174,9 +186,9 @@ HTML
                 :post_title   => title,
                 
                 :post_thumbnail => featured_image_id,
-                # :post_excerpt   => (post_excerpt || ""), 
+                :post_excerpt   => ((paragraphs.is_a?(Array) && paragraphs.any? ? paragraphs.first : "").gsub(/<[^>]+>/, '') rescue ""),
                 :comment_status => "closed",
-                # :post_name    => "/rubypress-is-the-best",
+                :post_name    => generate_slug(title),
                 :post_author  => 1                                  # 1 if there is only the admin user, otherwise the user's id
                 # :terms_names  => {
                 #     :category   => ['Category One','Category Two','Category Three'],
@@ -186,8 +198,16 @@ HTML
         )
 
       if result && !result.to_i.zero?
-        puts "✓ Пост успешно опубликован! ID поста: #{result}"
-        { success: true, post_id: result }
+        post_id = result
+        puts "✓ Пост успешно опубликован! ID поста: #{post_id}"
+
+        wppost = @client.getPost(
+          :post_id => post_id,
+        )
+        post_link = (wppost && wppost["link"]) ? URI.decode_www_form_component(wppost["link"]) : nil
+
+        puts "✓ Ссылка на пост: #{post_link}"
+        { success: true, url: post_link }
       else
         puts "✗ Не удалось опубликовать пост: #{result.inspect}"
         { success: false, error: result.inspect }
@@ -198,6 +218,7 @@ HTML
     end
   end
 
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Полный процесс публикации новости
   # title: заголовок
   # paragraphs: массив абзацев текста
@@ -304,6 +325,18 @@ HTML
     full_content = content_parts.join("\n\n")
 
     # Публикация поста
-    publish_post(title, full_content, featured_image_id)
+    publish_post(title, full_content, paragraphs, featured_image_id)
+  end
+
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  def generate_slug(title)
+    slug = title.dup
+    slug.gsub!(EMOJI_REGEX, '')
+    slug.gsub!(/[""«»„""]/, '')
+    slug.gsub!(' ', '-')
+    slug.gsub!(/-+/, '-')
+    slug.gsub!(/^-|-$/, '')
+    slug.downcase!
+    "/#{slug}"
   end
 end

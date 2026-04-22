@@ -187,56 +187,14 @@ class Herausgeber
     puts "\n" + "=" * 80
     puts "Опубликовал новостной пост «#{news_title}»"
     puts "-" * 80
-    
-    wordpress_url = nil
-    vk_url = nil
-    ok_url = nil
-    max_url = nil
-    
+
+    counter = 0
     @publications.each do |pub|
-      case pub[:platform]
-      when :wordpress
-        wordpress_url = pub[:url]
-      when :vkontakte
-        vk_url = pub[:url]
-      when :odnoklassniki
-        ok_url = pub[:url]
-      when :max
-        max_url = pub[:url]
-      end
+      next unless pub[:url]
+      counter += 1
+      puts "[#{counter}] Ссылка на опубликованную информацию #{pub[:description]}: #{pub[:url]}"
     end
-    
-    # [1] Ссылка на WordPress
-    if wordpress_url
-      puts "[1] Ссылка на публикацию информации на Сайте учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» (https://www.pnisurov.ru/ ): #{wordpress_url}"
-    else
-      puts "[1] Ссылка на публикацию информации на Сайте учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» (https://www.pnisurov.ru/ ): не опубликовано"
-    end
-    
-    # [2] Ссылка на Одноклассники
-    if ok_url
-      puts "[2] Ссылка на публикацию информации в госпаблике учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в социальной сети Одноклассники (https://ok.ru/pnisurov ): #{ok_url}"
-    else
-      puts "[2] Ссылка на публикацию информации в госпаблике учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в социальной сети Одноклассники (https://ok.ru/pnisurov ): не опубликовано"
-    end
-    
-    # [3] Ссылка на ВКонтакте
-    if vk_url
-      puts "[3] Ссылка на публикацию информации в госпаблике учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в социальной сети Вконтакте (https://vk.com/pnisurov ): #{vk_url}"
-    else
-      puts "[3] Ссылка на публикацию информации в госпаблике учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в социальной сети Вконтакте (https://vk.com/pnisurov ): не опубликовано"
-    end
-    
-    # [4] Ссылка на volganet.ru
-    puts "[4] Ссылка на публикацию информации на странице учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» на официальном портале Поставщиков социальных услуг Волгоградской области (https://442fz.volganet.ru/025016/ ): не опубликовано"
-    
-    # [5] Ссылка на MAX
-    if max_url
-      puts "[5] Ссылка на публикацию информации в официальной группе учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в Национальном мессенджере MAX (https://max.ru/id3430030612_gos ): #{max_url}"
-    else
-      puts "[5] Ссылка на публикацию информации в официальной группе учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в Национальном мессенджере MAX (https://max.ru/id3430030612_gos ): не опубликовано"
-    end
-    
+
     puts "=" * 80
   end
 
@@ -278,25 +236,25 @@ class Herausgeber
       when :wordpress_pnisurov
         result = publish_to_wordpress(files, text_data)
         if result && result[:success]
-          @publications << { platform: :wordpress, url: result[:url], title: text_data[:title] }
+          @publications << { platform: :wordpress, url: result[:url], title: text_data[:title], description: "на Сайте учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» (https://www.pnisurov.ru/)" }
           puts "\n✓ Публикация на WordPress выполнена успешно!"
         end
       when :vkontakte
         result = publish_to_vkontakte(files, text_data)
         if result && result[:success]
-          @publications << { platform: :vkontakte, url: result[:url], title: text_data[:title] }
+          @publications << { platform: :vkontakte, url: result[:url], title: text_data[:title], description: "в госпаблике учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в социальной сети Вконтакте (https://vk.com/pnisurov)" }
           puts "\n✓ Публикация в VKontakte выполнена успешно!"
         end
       when :odnoklassniki
         result = publish_to_odnoklassniki(files, text_data)
         if result && result[:success]
-          @publications << { platform: :odnoklassniki, url: result[:url], title: text_data[:title] }
+          @publications << { platform: :odnoklassniki, url: result[:url], title: text_data[:title], description: "в госпаблике учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в социальной сети Одноклассники (https://ok.ru/pnisurov)" }
           puts "\n✓ Публикация в Одноклассниках выполнена успешно!"
         end
       when :max_messenger
         result = publish_to_max(files, text_data)
         if result && result[:success]
-          @publications << { platform: :max, url: result[:url], title: text_data[:title] }
+          @publications << { platform: :max, url: result[:url], title: text_data[:title], description: "в официальной группе учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в Национальном мессенджере MAX (https://max.ru/id3430030612_gos)" }
           puts "\n✓ Публикация в MAX Messenger выполнена успешно!"
         end
       when :exit
@@ -330,12 +288,6 @@ class Herausgeber
       files[:videos]
     )
 
-    if result && result[:success]
-      # Формируем URL поста на WordPress
-      post_url = "#{@config['wordpress']['host'].gsub('xmlrpc.php', '').chomp('/')}?p=#{result[:post_id]}"
-      result[:url] = post_url
-    end
-    
     result
   end
   

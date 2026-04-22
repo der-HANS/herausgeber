@@ -10,7 +10,7 @@ require 'json'
 
 class MaxPublisher
   IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp].freeze
-  VIDEO_EXTENSIONS = %w[.mp4 .mov .avi .wmv].freeze
+  VIDEO_EXTENSIONS = %w[.mp4 .mov .avi .wmv .mkv].freeze
   
   # Базовый URL API MAX
   BASE_URL = 'https://platform-api.max.ru'
@@ -135,9 +135,9 @@ class MaxPublisher
       text_parts << paragraph.strip
     end
     
-    # Добавляем футер
-    footer = "\n------------------------------------------------\nБольше новостей — в нашем канале в мессенджере MAX: https://max.ru/id3430030612_gos"
-    text_parts << footer
+    # # Добавляем футер
+    # footer = "\n------------------------------------------------\nБольше новостей — в нашем канале в мессенджере MAX: https://max.ru/id3430030612_gos"
+    # text_parts << footer
     
     text_parts.join("\n")
   end
@@ -207,8 +207,11 @@ class MaxPublisher
        # Возвращаем объект attachment для сообщения
        {
          type: 'image',
-         uuid: file_uuid
+         payload: {
+           token: file_uuid
+         }
        }
+
        
      rescue => e
        puts "✗ Ошибка загрузки изображения: #{e.message}"
@@ -250,17 +253,26 @@ class MaxPublisher
          return nil
        end
        
-       # Шаг 2: Загружаем файл по полученному URL
-       upload_file_response = HTTParty.post(
-         upload_url,
-         {
-          headers: {
-            'Authorization' => "#{@access_token}",
-            'Content-Type' => 'video/mp4'
-          },
-          body: { data: File.open(file_path) }
-         }
-       )
+        # Шаг 2: Загружаем файл по полученному URL
+        filename = File.basename(file_path)
+        content_type = case File.extname(filename).downcase
+                       when '.mp4' then 'video/mp4'
+                       when '.mov' then 'video/quicktime'
+                       when '.avi' then 'video/x-msvideo'
+                       when '.wmv' then 'video/x-ms-wmv'
+                       when '.mkv' then 'video/x-matroska'
+                       else 'video/mp4' # default fallback
+                       end
+        upload_file_response = HTTParty.post(
+          upload_url,
+          {
+           headers: {
+             'Authorization' => "#{@access_token}",
+             'Content-Type' => content_type
+           },
+           body: { data: File.open(file_path) }
+          }
+        )
 
        if upload_file_response.code != 200 
          puts "✗ Ошибка загрузки файла: #{upload_file_response.code} - #{upload_file_response.message}"
@@ -294,8 +306,9 @@ class MaxPublisher
        # Формируем тело сообщения согласно API MAX
        # POST https://dev.max.ru/docs-api/methods/POST/messages
        payload = {
-         channel_id: @channel_id,
-         text: message_text
+          text: message_text,
+          disable_link_preview: true,
+          format: "html"
        }
        
        # Добавляем attachments если они есть
@@ -309,12 +322,13 @@ class MaxPublisher
        end
        
        response = HTTParty.post(
-         "#{BASE_URL}#{MESSAGES_ENDPOINT}",
+         "#{BASE_URL}#{MESSAGES_ENDPOINT}?chat_id=#{@channel_id}",
          headers: {
-           'Authorization' => "Bearer #{@access_token}",
+           'Authorization' => "#{@access_token}",
            'Content-Type' => 'application/json'
          },
          body: payload.to_json
+         #debug_output: $stdout
        )
        
        if response.code != 200
@@ -328,13 +342,12 @@ class MaxPublisher
        end
        
        message_data = response.parsed_response
-       message_id = message_data['message_id'] || message_data['id']
-       
+
        # Формируем URL на сообщение в канале
-       url = "https://max.ru/#{@channel_id}?m=#{message_id}"
+       url = message_data["message"]["url"]
        
-       puts "✓ Сообщение опубликовано (ID: #{message_id})"
-       { success: true, message_id: message_id, url: url }
+       puts "✓ Сообщение опубликовано (URL: #{url})"
+       { success: true, url: url }
        
      rescue => e
        puts "✗ Ошибка отправки сообщения: #{e.message}"
