@@ -13,7 +13,7 @@ class MaxPublisher
   VIDEO_EXTENSIONS = %w[.mp4 .mov .avi .wmv].freeze
   
   # Базовый URL API MAX
-  BASE_URL = 'https://api.max.ru'
+  BASE_URL = 'https://platform-api.max.ru'
   
   # Эндпоинты API согласно документации https://dev.max.ru/docs-api
   UPLOAD_ENDPOINT = '/uploads'
@@ -27,6 +27,7 @@ class MaxPublisher
     @channel_id = config['channel_id']
   end
   
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Публикация поста в канал MAX
   # title: заголовок новости (первая строка txt файла)
   # paragraphs: массив абзацев текста (остальные строки txt файла)
@@ -77,7 +78,7 @@ class MaxPublisher
     
     # Загружаем все медиафайлы и собираем attachment объекты
     attachments = []
-    
+
     media_to_upload.each_with_index do |media_info, index|
       puts "Загрузка медиафайла #{index + 1}/#{media_to_upload.length}: #{File.basename(media_info[:path])}"
       
@@ -114,6 +115,7 @@ class MaxPublisher
   
   private
   
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Формирование текста поста
   # Заголовок выделяется жирным шрифтом с помощью HTML тега <b>
   # Текст загружается без дополнительного форматирования, между абзацами отступ в строку
@@ -140,152 +142,204 @@ class MaxPublisher
     text_parts.join("\n")
   end
   
-  # Загрузка изображения через MAX API
-  # Возвращает объект attachment для использования в сообщении
-  def upload_image(file_path)
-    begin
-      filename = File.basename(file_path)
-      content_type = case File.extname(filename).downcase
-                     when '.jpg', '.jpeg' then 'image/jpeg'
-                     when '.png' then 'image/png'
-                     when '.gif' then 'image/gif'
-                     when '.webp' then 'image/webp'
-                     else 'image/jpeg'
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   # Загрузка изображения через MAX API
+   # Возвращает объект attachment для использования в сообщении
+   def upload_image(file_path)
+     begin
+       filename = File.basename(file_path)
+       
+       # Шаг 1: Получаем URL для загрузки
+       upload_response = HTTParty.post(
+         "#{BASE_URL}#{UPLOAD_ENDPOINT}?type=image",
+         headers: {
+           'Authorization' => "#{@access_token}"
+         }
+       )
+
+       if upload_response.code != 200
+         puts "✗ Ошибка получения URL для загрузки: #{upload_response.code} - #{upload_response.message}"
+         puts "Ответ API: #{upload_response.body}"
+         return nil
+       end
+       
+       upload_data = upload_response.parsed_response
+       upload_url = upload_data['url']
+
+       unless upload_url
+         puts "✗ Не получен URL для загрузки в ответе API"
+         puts "Ответ API: #{upload_response.body}"
+         return nil
+       end
+       
+       # Шаг 2: Загружаем файл по полученному URL
+       file_data = File.open(file_path)
+       content_type = case File.extname(filename).downcase
+                      when '.jpg', '.jpeg' then 'image/jpeg'
+                      when '.png' then 'image/png'
+                      when '.gif' then 'image/gif'
+                      when '.webp' then 'image/webp'
+                      else 'image/jpeg'
+                      end
+
+       upload_file_response = HTTParty.post(
+         upload_url, 
+         {
+            headers: {
+              'Authorization' => "#{@access_token}",
+              'Content-Type' => content_type
+            },
+            body: { data: file_data }
+         }
+       )
+
+       if upload_file_response.code != 200
+         puts "✗ Ошибка загрузки файла: #{upload_file_response.code} - #{upload_file_response.message}"
+         puts "Ответ API: #{upload_file_response.body}"
+         return nil
+       end
+       
+       file_info = upload_file_response.parsed_response
+       file_uuid = file_info["photos"].values.first["token"]
+
+       puts "✓ Изображение загружено: #{file_uuid}"
+       
+       # Возвращаем объект attachment для сообщения
+       {
+         type: 'image',
+         uuid: file_uuid
+       }
+       
+     rescue => e
+       puts "✗ Ошибка загрузки изображения: #{e.message}"
+       puts e.backtrace.first(5).join("\n")
+       nil
+     end
+   end
+  
+   #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   # Загрузка видео через MAX API
+   # Возвращает объект attachment для использования в сообщении
+   def upload_video(file_path)
+     begin
+      #  filename = File.basename(file_path)
+       
+       # Шаг 1: Получаем URL для загрузки
+       upload_response = HTTParty.post(
+         "#{BASE_URL}#{UPLOAD_ENDPOINT}?type=video",
+         headers: {
+           'Authorization' => "#{@access_token}"
+         }
+       )
+
+       if upload_response.code != 200
+         puts "✗ Ошибка получения URL для загрузки: #{upload_response.code} - #{upload_response.message}"
+         puts "Ответ API: #{upload_response.body}"
+         return nil
+       end
+       
+       upload_data = upload_response.parsed_response
+       upload_url = upload_data['url']
+
+       # Для видео токен приходит в ответе сразу до загрузки файла
+       file_token = upload_data["token"]
+
+       unless upload_url
+         puts "✗ Не получен URL для загрузки в ответе API"
+         puts "Ответ API: #{upload_response.body}"
+         return nil
+       end
+       
+       # Шаг 2: Загружаем файл по полученному URL
+       upload_file_response = HTTParty.post(
+         upload_url,
+         {
+          headers: {
+            'Authorization' => "#{@access_token}",
+            'Content-Type' => 'video/mp4'
+          },
+          body: { data: File.open(file_path) }
+         }
+       )
+
+       if upload_file_response.code != 200 
+         puts "✗ Ошибка загрузки файла: #{upload_file_response.code} - #{upload_file_response.message}"
+         puts "Ответ API: #{upload_file_response.body}"
+         return nil
+       end
+       
+       puts "✓ Видео загружено: #{file_token}"
+       
+       # Возвращаем объект attachment для сообщения
+       {
+         type: 'video',
+         payload: {
+           token: file_token
+         }
+       }
+       
+     rescue => e
+       puts "✗ Ошибка загрузки видео: #{e.message}"
+       puts e.backtrace.first(5).join("\n")
+       nil
+     end
+   end
+  
+   #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   # Отправка сообщения в канал
+   # message_text: текст сообщения с HTML форматированием
+   # attachments: массив объектов attachments (image, video)
+   def send_message(message_text, attachments)
+     begin
+       # Формируем тело сообщения согласно API MAX
+       # POST https://dev.max.ru/docs-api/methods/POST/messages
+       payload = {
+         channel_id: @channel_id,
+         text: message_text
+       }
+       
+       # Добавляем attachments если они есть
+       if attachments.any?
+         payload[:attachments] = attachments.map do |att|
+           {
+             type: att[:type],
+             payload: att[:payload] || { uuid: att[:uuid] }
+           }
+         end
+       end
+       
+       response = HTTParty.post(
+         "#{BASE_URL}#{MESSAGES_ENDPOINT}",
+         headers: {
+           'Authorization' => "Bearer #{@access_token}",
+           'Content-Type' => 'application/json'
+         },
+         body: payload.to_json
+       )
+       
+       if response.code != 200
+         error_msg = begin
+                       response.parsed_response['error'] || response.message
+                     rescue
+                       response.message
                      end
-      
-      # Загружаем файл напрямую через POST /uploads
-      file_data = File.read(file_path)
-      
-      response = HTTParty.post(
-        "#{BASE_URL}#{UPLOAD_ENDPOINT}",
-        headers: {
-          'Authorization' => "Bearer #{@access_token}"
-        },
-        body: {
-          file: HTTParty::UploadIO.new(file_path, content_type, filename)
-        }
-      )
-      
-      if response.code != 200
-        puts "✗ Ошибка загрузки файла: #{response.code} - #{response.message}"
-        puts "Ответ API: #{response.body}"
-        return nil
-      end
-      
-      file_info = response.parsed_response
-      file_uuid = file_info['uuid'] || file_info['file_id'] || file_info['id']
-      
-      puts "✓ Изображение загружено: #{file_uuid}"
-      
-      # Возвращаем объект attachment для сообщения
-      {
-        type: 'image',
-        uuid: file_uuid
-      }
-      
-    rescue => e
-      puts "✗ Ошибка загрузки изображения: #{e.message}"
-      puts e.backtrace.first(5).join("\n")
-      nil
-    end
-  end
-  
-  # Загрузка видео через MAX API
-  # Возвращает объект attachment для использования в сообщении
-  def upload_video(file_path)
-    begin
-      filename = File.basename(file_path)
-      content_type = 'video/mp4'
-      
-      # Загружаем файл напрямую через POST /uploads
-      response = HTTParty.post(
-        "#{BASE_URL}#{UPLOAD_ENDPOINT}",
-        headers: {
-          'Authorization' => "Bearer #{@access_token}"
-        },
-        body: {
-          file: HTTParty::UploadIO.new(file_path, content_type, filename)
-        }
-      )
-      
-      if response.code != 200
-        puts "✗ Ошибка загрузки файла: #{response.code} - #{response.message}"
-        puts "Ответ API: #{response.body}"
-        return nil
-      end
-      
-      file_info = response.parsed_response
-      file_uuid = file_info['uuid'] || file_info['file_id'] || file_info['id']
-      
-      puts "✓ Видео загружено: #{file_uuid}"
-      
-      # Возвращаем объект attachment для сообщения
-      {
-        type: 'video',
-        uuid: file_uuid
-      }
-      
-    rescue => e
-      puts "✗ Ошибка загрузки видео: #{e.message}"
-      puts e.backtrace.first(5).join("\n")
-      nil
-    end
-  end
-  
-  # Отправка сообщения в канал
-  # message_text: текст сообщения с HTML форматированием
-  # attachments: массив объектов attachments (image, video)
-  def send_message(message_text, attachments)
-    begin
-      # Формируем тело сообщения согласно API MAX
-      # POST https://dev.max.ru/docs-api/methods/POST/messages
-      payload = {
-        channel_id: @channel_id,
-        text: message_text
-      }
-      
-      # Добавляем attachments если они есть
-      if attachments.any?
-        payload[:attachments] = attachments.map do |att|
-          {
-            type: att[:type],
-            uuid: att[:uuid]
-          }
-        end
-      end
-      
-      response = HTTParty.post(
-        "#{BASE_URL}#{MESSAGES_ENDPOINT}",
-        headers: {
-          'Authorization' => "Bearer #{@access_token}",
-          'Content-Type' => 'application/json'
-        },
-        body: payload.to_json
-      )
-      
-      if response.code != 200
-        error_msg = begin
-                      response.parsed_response['error'] || response.message
-                    rescue
-                      response.message
-                    end
-        puts "✗ Ошибка публикации сообщения: #{response.code} - #{error_msg}"
-        return { success: false, error: error_msg }
-      end
-      
-      message_data = response.parsed_response
-      message_id = message_data['message_id'] || message_data['id']
-      
-      # Формируем URL на сообщение в канале
-      url = "https://max.ru/#{@channel_id}?m=#{message_id}"
-      
-      puts "✓ Сообщение опубликовано (ID: #{message_id})"
-      { success: true, message_id: message_id, url: url }
-      
-    rescue => e
-      puts "✗ Ошибка отправки сообщения: #{e.message}"
-      puts e.backtrace.first(5).join("\n")
-      { success: false, error: e.message }
-    end
-  end
+         puts "✗ Ошибка публикации сообщения: #{response.code} - #{error_msg}"
+         return { success: false, error: error_msg }
+       end
+       
+       message_data = response.parsed_response
+       message_id = message_data['message_id'] || message_data['id']
+       
+       # Формируем URL на сообщение в канале
+       url = "https://max.ru/#{@channel_id}?m=#{message_id}"
+       
+       puts "✓ Сообщение опубликовано (ID: #{message_id})"
+       { success: true, message_id: message_id, url: url }
+       
+     rescue => e
+       puts "✗ Ошибка отправки сообщения: #{e.message}"
+       puts e.backtrace.first(5).join("\n")
+       { success: false, error: e.message }
+     end
+   end
 end
