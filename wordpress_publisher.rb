@@ -42,9 +42,43 @@ class WordPressPublisher
       puts "✗ Ошибка подключения к WordPress: #{e.message}"
       false
     end
+end
+
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  # Только загрузка медиафайлов без публикации поста
+  # files: массив путей [logo, images, videos]
+  # Возвращает { success: true, media_urls: [{ filename: "...", url: "..." }] }
+  def upload_media_only(files)
+    puts "\n=== Загрузка медиафайлов без публикации поста ==="
+    
+    media_urls = []
+    
+    files = files.flatten.select { |f| f && File.exist?(f) }
+    
+    files.each do |file_path|
+      filename = File.basename(file_path)
+      mime_type = get_mime_type(file_path)
+      media_result = upload_media(file_path, mime_type)
+      if media_result
+        media_urls << {
+          filename: filename,
+          url: media_result[:url],
+          id: media_result[:id],
+          is_video: VIDEO_EXTENSIONS.any? { |ext| file_path.downcase.end_with?(ext) }
+        }
+      end
+    end
+    
+    if media_urls.any?
+      puts "✓ Загружено медиафайлов: #{media_urls.length}"
+      { success: true, media_urls: media_urls }
+    else
+      puts "✗ Не удалось загрузить медиафайлы"
+      { success: false, error: "Загрузка медиафайлов не удалась", media_urls: [] }
+    end
   end
 
-  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Загрузка медиафайла на WordPress
   # Возвращает hash с id и url загруженного файла
   def upload_media(file_path, mime_type)
@@ -72,7 +106,7 @@ class WordPressPublisher
     end
   end
 
-  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Определение MIME типа по расширению файла
   def get_mime_type(file_path)
     ext = File.extname(file_path).downcase
@@ -162,7 +196,8 @@ HTML
   # content: содержимое поста (HTML строка)
   # featured_image_id: ID обложки (может быть nil)
   # status: статус поста ('publish', 'draft', etc.)
-  def publish_post(title, content, paragraphs = [], featured_image_id = nil, status = 'publish')
+  # media_urls: массив загруженных медиафайлов для возврата
+  def publish_post(title, content, paragraphs = [], featured_image_id = nil, status = 'publish', media_urls = [])
     begin
       # post_data = {
       #   title: title,
@@ -207,14 +242,14 @@ HTML
         post_link = (wppost && wppost["link"]) ? URI.decode_www_form_component(wppost["link"]) : nil
 
         puts "✓ Ссылка на пост: #{post_link}"
-        { success: true, url: post_link }
+        { success: true, url: post_link, media_urls: media_urls }
       else
         puts "✗ Не удалось опубликовать пост: #{result.inspect}"
-        { success: false, error: result.inspect }
+        { success: false, error: result.inspect, media_urls: media_urls }
       end
     rescue => e
       puts "✗ Ошибка публикации поста: #{e.message}"
-      { success: false, error: e.message }
+      { success: false, error: e.message, media_urls: media_urls }
     end
   end
 
@@ -318,6 +353,16 @@ HTML
       end
     end
 
+    # Собираем массив загруженных медиафайлов для возврата
+    media_urls = uploaded_media.map do |filename, media_info|
+      {
+        filename: filename,
+        url: media_info[:url],
+        id: media_info[:id],
+        is_video: media_info[:is_video]
+      }
+    end
+    
     # Добавляем футер
     content_parts << generate_footer_block
 
@@ -325,10 +370,12 @@ HTML
     full_content = content_parts.join("\n\n")
 
     # Публикация поста
-    publish_post(title, full_content, paragraphs, featured_image_id)
+    publish_result = publish_post(title, full_content, paragraphs, featured_image_id, media_urls)
+    publish_result[:media_urls] = media_urls
+    publish_result
   end
-
-  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   def generate_slug(title)
     slug = title.dup
     slug.gsub!(EMOJI_REGEX, '')

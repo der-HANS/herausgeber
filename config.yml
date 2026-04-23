@@ -19,3 +19,8 @@ odnoklassniki:
 max:
   access_token: ""
   channel_id: "id3430030612_gos"
+
+bitrix:
+  host: "https://442fz.volganet.ru"
+  username: ""
+  password: ""

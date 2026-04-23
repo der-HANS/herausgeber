@@ -9,6 +9,7 @@ require_relative 'wordpress_publisher'
 require_relative 'vk_publisher'
 require_relative 'ok_publisher'
 require_relative 'max_publisher'
+require_relative 'bitrix_publisher'
 
 class Herausgeber
   IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp].freeze
@@ -158,6 +159,7 @@ class Herausgeber
     puts "2. Опубликовать новость в VKontakte (vk.com)"
     puts "3. Опубликовать новость в Одноклассниках (ok.ru)"
     puts "4. Опубликовать новость в MAX Messenger"
+    puts "5. Опубликовать новость на сайт volganet.ru"
     puts "0. Завершить работу и показать отчет"
     puts "-" * 50
     print "Выберите опцию: "
@@ -174,6 +176,8 @@ class Herausgeber
       :odnoklassniki
     when '4'
       :max_messenger
+    when '5'
+      :volganet
     when '0', nil
       :exit
     else
@@ -236,7 +240,7 @@ class Herausgeber
       when :wordpress_pnisurov
         result = publish_to_wordpress(files, text_data)
         if result && result[:success]
-          @publications << { platform: :wordpress, url: result[:url], title: text_data[:title], description: "на Сайте учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» (https://www.pnisurov.ru/)" }
+          @publications << { platform: :wordpress, url: result[:url], title: text_data[:title], description: "на Сайте учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» (https://www.pnisurov.ru/)", media_urls: result[:media_urls] || [] }
           puts "\n✓ Публикация на WordPress выполнена успешно!"
         end
       when :vkontakte
@@ -256,6 +260,12 @@ class Herausgeber
         if result && result[:success]
           @publications << { platform: :max, url: result[:url], title: text_data[:title], description: "в официальной группе учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» в Национальном мессенджере MAX (https://max.ru/id3430030612_gos)" }
           puts "\n✓ Публикация в MAX Messenger выполнена успешно!"
+        end
+      when :volganet
+        result = publish_to_volganet(files, text_data)
+        if result && result[:success]
+          @publications << { platform: :volganet, url: result[:url], title: text_data[:title], description: "на Портале учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» (https://442fz.volganet.ru/)" }
+          puts "\n✓ Публикация на volganet выполнена успешно!"
         end
       when :exit
         # Вывод отчета и завершение
@@ -357,6 +367,84 @@ class Herausgeber
       files[:videos]
     )
     
+    result
+  end
+
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  # Публикация на volganet (Bitrix)
+  def publish_to_volganet(files, text_data)
+    bitrix_config = @config['bitrix']
+    
+    unless bitrix_config && bitrix_config['host'] && bitrix_config['username'] && bitrix_config['password']
+      puts "✗ Ошибка: В config.yml отсутствуют настройки для Bitrix (host, username, password)"
+      return { success: false, error: "Отсутствуют настройки Bitrix" }
+    end
+    
+    # Ищем публикацию на WordPress в текущей сессии
+    wordpress_publication = @publications.find { |p| p[:platform] == :wordpress }
+    
+    media_urls = nil
+    
+    # if wordpress_publication && wordpress_publication[:media_urls] && wordpress_publication[:media_urls].any?
+    #   # Используем media_urls из публикации на WordPress
+    #   media_urls = wordpress_publication[:media_urls]
+    #   puts "✓ Найдена публикация на pnisurov, используем загруженные медиафайлы"
+    # else
+    #   # Запрашиваем у пользователя
+    #   puts "\nВнимание: Публикация на volganet осуществляется после публикации на pnisurov."
+    #   puts "На сайте volganet нельзя загружать видео и изображения."
+    #   puts "Опубликовать сначала на pnisurov для загрузки медиафайлов? [y/n]"
+    #   answer = STDIN.gets&.strip
+      
+    #   if answer == 'y'
+    #     # Публикуем на WordPress только для загрузки медиа
+    #     wp_result = publish_to_wordpress_only_media(files, text_data)
+    #     unless wp_result && wp_result[:success]
+    #       puts "✗ Не удалось загрузить медиафайлы на pnisurov"
+    #       return { success: false, error: "Не удалось загрузить медиафайлы" }
+    #     end
+    #     media_urls = wp_result[:media_urls]
+    #   else
+    #     puts "Публикация на volganet отменена"
+    #     return { success: false, error: "Требуется предварительная публикация на pnisurov" }
+    #   end
+    # end
+    
+    # Подключаемся к Bitrix и публикуем
+    puts "\n=== Публикация на volganet ==="
+    publisher = BitrixPublisher.new(bitrix_config)
+    
+    unless publisher.connect
+      puts "✗ Не удалось подключиться к Bitrix"
+      return { success: false, error: "Не удалось подключиться к Bitrix" }
+    end
+    
+    result = publisher.publish_news(
+      text_data[:title],
+      text_data[:paragraphs],
+      media_urls
+    )
+    
+    publisher.disconnect
+    result
+  end
+
+  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  # Публикация только медиа на WordPress (без поста)
+  def publish_to_wordpress_only_media(files, text_data)
+    wordpress_config = @config['wordpress']
+    
+    publisher = WordPressPublisher.new(wordpress_config)
+    
+    unless publisher.connect
+      puts "✗ Не удалось подключиться к WordPress"
+      return { success: false, error: "Не удалось подключиться к WordPress" }
+    end
+    
+    # Собираем все медиафайлы
+    all_media = [files[:logo]] + files[:images] + files[:videos]
+    
+    result = publisher.upload_media_only(all_media)
     result
   end
 end
