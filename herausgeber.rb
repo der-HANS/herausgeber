@@ -385,30 +385,30 @@ class Herausgeber
     
     media_urls = nil
     
-    # if wordpress_publication && wordpress_publication[:media_urls] && wordpress_publication[:media_urls].any?
-    #   # Используем media_urls из публикации на WordPress
-    #   media_urls = wordpress_publication[:media_urls]
-    #   puts "✓ Найдена публикация на pnisurov, используем загруженные медиафайлы"
-    # else
-    #   # Запрашиваем у пользователя
-    #   puts "\nВнимание: Публикация на volganet осуществляется после публикации на pnisurov."
-    #   puts "На сайте volganet нельзя загружать видео и изображения."
-    #   puts "Опубликовать сначала на pnisurov для загрузки медиафайлов? [y/n]"
-    #   answer = STDIN.gets&.strip
+    if wordpress_publication && wordpress_publication[:media_urls] && wordpress_publication[:media_urls].any?
+      # Используем media_urls из публикации на WordPress
+      media_urls = wordpress_publication[:media_urls]
+      puts "✓ Найдена публикация на pnisurov, используем загруженные медиафайлы"
+    else
+      # Запрашиваем у пользователя
+      puts "\nВнимание: Публикация на volganet осуществляется после публикации на pnisurov."
+      puts "На сайте volganet нельзя загружать видео и изображения."
+      puts "Опубликовать сначала на pnisurov для загрузки медиафайлов? [y/n]"
+      answer = STDIN.gets&.strip
       
-    #   if answer == 'y'
-    #     # Публикуем на WordPress только для загрузки медиа
-    #     wp_result = publish_to_wordpress_only_media(files, text_data)
-    #     unless wp_result && wp_result[:success]
-    #       puts "✗ Не удалось загрузить медиафайлы на pnisurov"
-    #       return { success: false, error: "Не удалось загрузить медиафайлы" }
-    #     end
-    #     media_urls = wp_result[:media_urls]
-    #   else
-    #     puts "Публикация на volganet отменена"
-    #     return { success: false, error: "Требуется предварительная публикация на pnisurov" }
-    #   end
-    # end
+      if answer == 'y'
+        # Публикуем на WordPress только для загрузки медиа
+        wp_result = publish_to_wordpress_only_media(files, text_data)
+        unless wp_result && wp_result[:success]
+          puts "✗ Не удалось загрузить медиафайлы на pnisurov"
+          return { success: false, error: "Не удалось загрузить медиафайлы" }
+        end
+        media_urls = wp_result[:media_urls]
+      else
+        puts "Публикация на volganet отменена"
+        return { success: false, error: "Требуется предварительная публикация на pnisurov" }
+      end
+    end
     
     # Подключаемся к Bitrix и публикуем
     puts "\n=== Публикация на volganet ==="
