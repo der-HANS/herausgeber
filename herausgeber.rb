@@ -263,9 +263,12 @@ class Herausgeber
         end
       when :volganet
         result = publish_to_volganet(files, text_data)
-        if result && result[:success]
-          @publications << { platform: :volganet, url: result[:url], title: text_data[:title], description: "на Портале учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» (https://442fz.volganet.ru/)" }
+        if result&.dig(:success)
+          volganet_url = result[:url] || "https://442fz.volganet.ru/"
+          @publications << { platform: :volganet, url: volganet_url, title: text_data[:title], description: "на Портале учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» (https://442fz.volganet.ru/)" }
           puts "\n✓ Публикация на volganet выполнена успешно!"
+        elsif result
+          puts "✗ Публикация на volganet не выполнена: #{result[:error]}"
         end
       when :exit
         # Вывод отчета и завершение
@@ -370,35 +373,40 @@ class Herausgeber
     result
   end
 
-  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+
+#▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   # Публикация на volganet (Bitrix)
   def publish_to_volganet(files, text_data)
     bitrix_config = @config['bitrix']
-    
+
     unless bitrix_config && bitrix_config['host'] && bitrix_config['username'] && bitrix_config['password']
       puts "✗ Ошибка: В config.yml отсутствуют настройки для Bitrix (host, username, password)"
       return { success: false, error: "Отсутствуют настройки Bitrix" }
     end
-    
+
     # Ищем публикацию на WordPress в текущей сессии
     wordpress_publication = @publications.find { |p| p[:platform] == :wordpress }
-    
+
     media_urls = nil
-    
+
     if wordpress_publication && wordpress_publication[:media_urls] && wordpress_publication[:media_urls].any?
       # Используем media_urls из публикации на WordPress
       media_urls = wordpress_publication[:media_urls]
       puts "✓ Найдена публикация на pnisurov, используем загруженные медиафайлы"
     else
-      # Запрашиваем у пользователя
       puts "\nВнимание: Публикация на volganet осуществляется после публикации на pnisurov."
-      puts "На сайте volganet нельзя загружать видео и изображения."
-      puts "Опубликовать сначала на pnisurov для загрузки медиафайлов? [y/n]"
+      puts "Просто загрузить медиафайлы на pnisurov.ru без публикации поста? [y/n]"
       answer = STDIN.gets&.strip
-      
+
       if answer == 'y'
-        # Публикуем на WordPress только для загрузки медиа
-        wp_result = publish_to_wordpress_only_media(files, text_data)
+        wordpress_config = @config['wordpress']
+        wp_publisher = WordPressPublisher.new(wordpress_config)
+        unless wp_publisher.connect
+          puts "✗ Не удалось подключиться к WordPress"
+          return { success: false, error: "Не удалось подключиться к WordPress" }
+        end
+        files_array = [files[:logo], files[:images], files[:videos]].flatten.select { |f| f && File.exist?(f) }
+        wp_result = wp_publisher.upload_media_only(files_array)
         unless wp_result && wp_result[:success]
           puts "✗ Не удалось загрузить медиафайлы на pnisurov"
           return { success: false, error: "Не удалось загрузить медиафайлы" }
@@ -409,43 +417,25 @@ class Herausgeber
         return { success: false, error: "Требуется предварительная публикация на pnisurov" }
       end
     end
-    
-    # Подключаемся к Bitrix и публикуем
+
     puts "\n=== Публикация на volganet ==="
     publisher = BitrixPublisher.new(bitrix_config)
-    
+
     unless publisher.connect
       puts "✗ Не удалось подключиться к Bitrix"
       return { success: false, error: "Не удалось подключиться к Bitrix" }
     end
-    
+
     result = publisher.publish_news(
       text_data[:title],
       text_data[:paragraphs],
-      media_urls
+      media_urls,
+      files[:logo]
     )
-    
+
     publisher.disconnect
     result
-  end
 
-  #▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-  # Публикация только медиа на WordPress (без поста)
-  def publish_to_wordpress_only_media(files, text_data)
-    wordpress_config = @config['wordpress']
-    
-    publisher = WordPressPublisher.new(wordpress_config)
-    
-    unless publisher.connect
-      puts "✗ Не удалось подключиться к WordPress"
-      return { success: false, error: "Не удалось подключиться к WordPress" }
-    end
-    
-    # Собираем все медиафайлы
-    all_media = [files[:logo]] + files[:images] + files[:videos]
-    
-    result = publisher.upload_media_only(all_media)
-    result
   end
 end
 
