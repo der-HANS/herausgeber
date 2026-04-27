@@ -265,7 +265,7 @@ class Herausgeber
         result = publish_to_volganet(files, text_data)
         if result&.dig(:success)
           volganet_url = result[:url] || "https://442fz.volganet.ru/"
-          @publications << { platform: :volganet, url: volganet_url, title: text_data[:title], description: "на Портале учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» (https://442fz.volganet.ru/)" }
+          @publications << { platform: :volganet, url: volganet_url, title: text_data[:title], description: "на странице учреждения ГБССУ СО ГПВИ «Суровикинский ДСО» на официальном портале Поставщиков социальных услуг Волгоградской области (https://442fz.volganet.ru/025016/)" }
           puts "\n✓ Публикация на volganet выполнена успешно!"
         elsif result
           puts "✗ Публикация на volganet не выполнена: #{result[:error]}"

@@ -174,12 +174,12 @@ HTML
   # Генерация футера новости (Gutenberg формат)
   def generate_footer_block
     <<-HTML
-<!-- wp:separator {"style":{"spacing":{"margin":{"top":"var:preset|spacing|40","bottom":"var:preset|spacing|40"}}}} -->
-<hr class="wp-block-separator has-alpha-channel-opacity" style="margin-top:var(--wp--preset--spacing--40);margin-bottom:var(--wp--preset--spacing--40)"/>
+<!-- wp:separator {"style":{"spacing":{"margin":{"top":"var:preset|spacing|60","bottom":"var:preset|spacing|40"}}}} -->
+<hr class="wp-block-separator has-alpha-channel-opacity" style="margin-top:var(--wp--preset--spacing--60);margin-bottom:var(--wp--preset--spacing--40)"/>
 <!-- /wp:separator -->
 
-<!-- wp:paragraph -->
-<p><em>Больше новостей — в нашем официальном канале в <strong><a href="https://max.ru/id3430030612_gos">мессенджере MAX</a></strong></em></p>
+<!-- wp:paragraph {"align":"center","fontSize":"medium"} -->
+<p class="has-text-align-center has-medium-font-size"><em>Больше новостей — в нашем официальном канале в <strong><a href="https://max.ru/id3430030612_gos">мессенджере MAX</a></strong></em></p>
 <!-- /wp:paragraph -->
 HTML
   end
